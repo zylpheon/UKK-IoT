@@ -611,7 +611,7 @@
         "id": "6990e26b7c749c3e",
         "type": "mqtt-broker",
         "name": "MQTT Broker Lokal",
-        "broker": "10.201.1.152",
+        "broker": "10.20.11.122",
         "port": "1883",
         "clientid": "nodered_hydro",
         "autoConnect": true,

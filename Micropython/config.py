@@ -14,7 +14,7 @@ WIFI_SSID     = "pova6"
 WIFI_PASSWORD = "gungun82"
 
 # KONFIGURASI MQTT BROKER (Node-RED)
-MQTT_BROKER   = "10.208.55.177"   # ← ganti dengan IP komputer/server Node-RED kamu
+MQTT_BROKER   = "10.20.11.122"   # ← ganti dengan IP komputer/server Node-RED kamu
 MQTT_PORT     = 1883
 MQTT_USER     = ""                # kosongkan jika broker tidak pakai auth
 MQTT_PASSWORD = ""                # kosongkan jika broker tidak pakai auth
