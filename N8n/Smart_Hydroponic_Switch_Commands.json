@@ -1,0 +1,1040 @@
+{
+  "name": "Smart Hydroponic - MQTT + Thingspeak",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ===== PARSE MQTT SENSOR DATA =====\nconst item = $input.first().json;\n\nlet payload;\ntry {\n  if (item.message && typeof item.message === 'object') {\n    payload = item.message;\n  } else if (item.message && typeof item.message === 'string') {\n    payload = JSON.parse(item.message);\n  } else if (item.suhu !== undefined || item.tinggi_air !== undefined) {\n    payload = item;\n  } else {\n    payload = item;\n  }\n} catch (e) {\n  throw new Error('Gagal parse MQTT payload: ' + e.message + ' | Raw: ' + JSON.stringify(item));\n}\n\nconst suhu = Math.round(parseFloat(payload.suhu || 0) * 100) / 100;\nconst kelembaban = Math.round(parseFloat(payload.kelembaban || 0) * 10) / 10;\nconst tinggi_air = Math.round(parseFloat(payload.tinggi_air || 0) * 10) / 10;\nconst pompa_on = payload.pompa === true || payload.pompa === 'true' || payload.pompa === 1 || parseInt(payload.pompa) === 1;\nconst mode_auto = payload.mode === undefined ? true : (payload.mode === 'AUTO' || payload.mode === 1 || payload.mode === true);\n\nconst pad = (n) => String(n).padStart(2, '0');\nconst now = new Date();\nconst wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));\nconst timestamp = `${pad(wibTime.getUTCDate())}-${pad(wibTime.getUTCMonth() + 1)}-${wibTime.getUTCFullYear()} ${pad(wibTime.getUTCHours())}:${pad(wibTime.getUTCMinutes())}:${pad(wibTime.getUTCSeconds())}`;\n\nconst is_critical = tinggi_air >= 20;\nconst mode_text = mode_auto ? 'AUTO' : 'MANUAL';\n\nconst staticData = $getWorkflowStaticData('global');\nconst nowMs = Date.now();\nconst lastAlertTime = staticData.lastCriticalAlertTime || 0;\nconst throttle_ms = 15000;\nconst can_alert = (nowMs - lastAlertTime) > throttle_ms;\n\nif (is_critical && can_alert) {\n  staticData.lastCriticalAlertTime = nowMs;\n}\n\nreturn [{\n  json: {\n    timestamp, suhu, kelembaban, tinggi_air,\n    pompa_status: pompa_on ? 'ON' : 'OFF',\n    mode: mode_text,\n    is_critical,\n    can_send_alert: is_critical && can_alert,\n    esp32_timestamp: payload.timestamp || 0\n  }\n}];"
+      },
+      "id": "e2d3245f-03ed-4a60-823a-89b69524e57a",
+      "name": "Validasi Kondisi Air",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1vk15h8fOLbqaAoyZ5KyEP9IDfnsmmCuR9T2A3Z3YSFg",
+          "mode": "list",
+          "cachedResultName": "IoTPKKN8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vk15h8fOLbqaAoyZ5KyEP9IDfnsmmCuR9T2A3Z3YSFg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vk15h8fOLbqaAoyZ5KyEP9IDfnsmmCuR9T2A3Z3YSFg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "suhu": "={{ $json.suhu }}",
+            "kelembaban": "={{ $json.kelembaban }}",
+            "tinggi_air": "={{ $json.tinggi_air }}",
+            "pompa_status": "={{ $json.pompa_status }}",
+            "is_critical": "={{ $json.is_critical }}",
+            "mode_system": "={{ $json.mode }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "suhu",
+              "displayName": "suhu",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kelembaban",
+              "displayName": "kelembaban",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tinggi_air",
+              "displayName": "tinggi_air",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "pompa_status",
+              "displayName": "pompa_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "is_critical",
+              "displayName": "is_critical",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mode_system",
+              "displayName": "mode_system",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3db1e5e7-50b9-4379-8e0c-432ed82c5869",
+      "name": "Simpan Data ke Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -464,
+        64
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HMqpgQpH4irjsO46",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.thingspeak.com/update?api_key=XE6GU2QH1KQ797PF&field1={{ $('Validasi Kondisi Air').item.json.suhu }}&field2={{ $('Validasi Kondisi Air').item.json.kelembaban }}&field3={{ $('Validasi Kondisi Air').item.json.tinggi_air }}&field4={{ $('Validasi Kondisi Air').item.json.pompa_status === 'ON' ? 1 : 0 }}&field5={{ $('Validasi Kondisi Air').item.json.mode === 'AUTO' ? 1 : 0 }}&status={{ $('Validasi Kondisi Air').item.json.is_critical ? 'DARURAT' : 'NORMAL' }}",
+        "options": {}
+      },
+      "id": "2b658702-6778-4496-8388-df853ec6c627",
+      "name": "Kirim ke ThingSpeak",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        288
+      ],
+      "notes": "JALUR A: Kirim data sensor ke ThingSpeak untuk grafik & log historis"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-critical",
+              "leftValue": "={{ $('Validasi Kondisi Air').item.json.can_send_alert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "48c86b04-362a-48f8-ad8a-12efb045ae81",
+      "name": "Apakah Air Kritis?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        64
+      ],
+      "notes": "TRUE = DARURAT → AI rangkai pesan → kirim notif Telegram\nFALSE = aman → skip"
+    },
+    {
+      "parameters": {
+        "chatId": "5109311613",
+        "text": "=🚨 *PERINGATAN DARURAT!* 🚨\n――――――――――――――――――――\n⏰ *Waktu:* {{ $('Validasi Kondisi Air').item.json.timestamp }}\n💧 *Tinggi Air:* {{ $('Validasi Kondisi Air').item.json.tinggi_air }} cm ⚠️ KRITIS (>= 20 cm)\n🌡️ *Suhu:* {{ $('Validasi Kondisi Air').item.json.suhu }}°C\n💦 *Kelembaban:* {{ $('Validasi Kondisi Air').item.json.kelembaban }}%\n🔧 *Pompa:* {{ $('Validasi Kondisi Air').item.json.pompa_status }}\n⚙️ *Mode Sistem:* {{ $('Validasi Kondisi Air').item.json.mode }}\n――――――――――――――――――――\n⚡ *Segera tambah air nutrisi ke tandon!*\nGunakan /status untuk laporan lengkap.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "c4272da9-7e57-468f-8d89-12023d4c318d",
+      "name": "Kirim Peringatan Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -80
+      ],
+      "webhookId": "27875249-cad9-417c-8f79-588a961fb12d",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHKmlzzOWFVGsZVJ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "1c679de7-7d69-494c-81b2-775e6c634915",
+      "name": "Aman (Skip)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Baca data sensor terkini atau historis dari Google Sheets. Gunakan untuk menjawab pertanyaan tentang kondisi suhu, kelembaban, tinggi air, status pompa, dan mode sistem. Ambil baris terakhir untuk data paling terkini.",
+        "documentId": {
+          "__rl": true,
+          "value": "1vk15h8fOLbqaAoyZ5KyEP9IDfnsmmCuR9T2A3Z3YSFg",
+          "mode": "list",
+          "cachedResultName": "IoTPKKN8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vk15h8fOLbqaAoyZ5KyEP9IDfnsmmCuR9T2A3Z3YSFg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vk15h8fOLbqaAoyZ5KyEP9IDfnsmmCuR9T2A3Z3YSFg/edit#gid=0"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -272,
+        1056
+      ],
+      "id": "ef0f3d83-8c83-46d4-9784-1ab66d06fdc4",
+      "name": "Baca Sensor MQTT Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HMqpgQpH4irjsO46",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        1056
+      ],
+      "id": "cbff592e-f7d7-45ea-b47d-76985a7e74f1",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "FAK8gYv7zNa618pE",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "03ad503d-de8a-4daa-9129-cd8c91c5b862",
+      "name": "Telegram Trigger (Chatbot)1",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -864,
+        720
+      ],
+      "webhookId": "08c1feca-c7a5-43e9-982e-82b0bda14172",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHKmlzzOWFVGsZVJ",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "JALUR B: AI CHATBOT\nTerima perintah Telegram → AI Agent → Publish MQTT ke ESP32"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.first().json.message.text || '';\nconst isStart = text.toLowerCase() === '/start';\n\nlet replyText = '';\n\nif (isStart) {\n  replyText = `🌿 <b>Selamat datang di Smart Hydroponic Bot!</b> 🌿\n━━━━━━━━━━━━━━━━━━━━\nHalo! Saya adalah asisten pintar untuk memantau dan mengontrol sistem hidroponik Anda secara real-time.\n\n💡 Ketik /help untuk melihat <b>daftar lengkap perintah</b> yang tersedia.`;\n} else {\n  replyText = `📋 <b>DAFTAR PERINTAH BOT</b>\n━━━━━━━━━━━━━━━━━━━━\n\n📊 <b>/status</b>\nLihat laporan sensor real-time:\nsuhu, kelembaban, tinggi air, status pompa, dan mode sistem.\n\n⚙️ <b>/auto</b>\nAktifkan mode <b>OTOMATIS</b>.\nPompa dikontrol otomatis berdasarkan sensor.\n\n🔧 <b>/manual</b>\nAktifkan mode <b>MANUAL</b>.\nKontrol pompa secara langsung.\n\n✅ <b>/pompaon</b>\nNyalakan pompa secara manual.\n<i>(Hanya aktif saat mode MANUAL)</i>\n\n❌ <b>/pompaoff</b>\nMatikan pompa secara manual.\n<i>(Hanya aktif saat mode MANUAL)</i>\n\n❓ <b>/help</b>\nTampilkan daftar perintah ini.\n━━━━━━━━━━━━━━━━━━━━\n💬 Anda juga bisa <b>bertanya bebas</b> seputar kondisi sistem hidroponik Anda!`;\n}\n\nreturn [{ json: { replyText, chatId: $input.first().json.message.chat.id } }];"
+      },
+      "id": "fb2a76ee-f9ce-4b7f-8742-2887fd51b1ae",
+      "name": "Buat Pesan /help atau /start1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.replyText }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "e1af2674-0bbd-4d4a-a6df-5af3ad441138",
+      "name": "Kirim Pesan /help atau /start1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -192,
+        608
+      ],
+      "webhookId": "help-reply-webhook-001",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHKmlzzOWFVGsZVJ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "Kamu adalah asisten pintar untuk sistem Smart Hydroponic. Tugasmu menangani perintah Telegram dan memberikan respons dalam Bahasa Indonesia.\n\n=== DAFTAR PERINTAH ===\n\n/status\n→ Ambil data real-time menggunakan tool [Baca Sensor MQTT Google Sheets], lalu tampilkan laporan lengkap dengan format HTML:\n  - Waktu data diambil\n  - Suhu (°C)\n  - Kelembaban (%)\n  - Tinggi Air (cm) + status:\nATURAN LOGIKA SENSOR AIR (WAJIB DIPATUHI):\nData 'tinggi_air' adalah JARAK KOSONG antara sensor (atap tandon) ke permukaan air.\n1. Jika tinggi_air <= 5 cm : Status = \"NORMAL (Air Penuh)\"\n2. Jika tinggi_air >= 20 cm : Status = \"DARURAT (Air Kosong/Kritis)\"\n3. Jika tinggi_air di antara 5 cm dan 20 cm : Status = \"SIAGA (Terisi Sebagian)\"\n  - Status Pompa: ON/OFF\n  - Mode Sistem: AUTO/MANUAL\n\n/manual\n→ WAJIB gunakan tool [Kirim Perintah MQTT] dengan topic: hydroponic/command dan payload teks: MODE_MANUAL\n→ Setelah berhasil, konfirmasi: sistem beralih ke mode MANUAL. Pompa kini bisa dikontrol manual.\n\n/auto\n→ WAJIB gunakan tool [Kirim Perintah MQTT] dengan topic: hydroponic/command dan payload teks: MODE_AUTO\n→ Setelah berhasil, konfirmasi: sistem kembali ke mode AUTO. Pompa dikontrol otomatis oleh sensor.\n\n/pompaon\n→ WAJIB gunakan tool [Kirim Perintah MQTT] dengan topic: hydroponic/command dan payload teks: POMPA_ON\n→ Setelah berhasil, konfirmasi: perintah NYALAKAN POMPA dikirim. (Hanya efektif saat mode MANUAL)\n\n/pompaoff\n→ WAJIB gunakan tool [Kirim Perintah MQTT] dengan topic: hydroponic/command dan payload teks: POMPA_OFF\n→ Setelah berhasil, konfirmasi: perintah MATIKAN POMPA dikirim. (Hanya efektif saat mode MANUAL)\n\n=== ATURAN PENTING ===\n- Format semua respons menggunakan HTML tags: <b>tebal</b>, <i>miring</i>. JANGAN gunakan Markdown (*bold*).\n- Untuk perintah kontrol (/manual, /auto, /pompaon, /pompaoff): SELALU gunakan tool MQTT terlebih dahulu, baru balas konfirmasi.\n- Untuk /status: SELALU gunakan tool Google Sheets untuk mendapat data terkini.\n- Jawab singkat, jelas, dan ramah.\n\nATURAN HTML TELEGRAM (SANGAT PENTING):\n1. DILARANG KERAS menggunakan tag <br> atau <br/> untuk membuat baris baru. Gunakan Enter (newline murni) biasa.\n2. DILARANG menggunakan Markdown (seperti ** atau *).\n3. HANYA gunakan tag <b> untuk menebalkan teks atau <i> untuk teks miring."
+        }
+      },
+      "id": "bc7085bc-1fe4-4063-86cc-293568c71dac",
+      "name": "AI Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -352,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger (Chatbot)1').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "0864e4bd-8140-41c6-8350-dd0db5d3a27c",
+      "name": "Kirim Balasan Telegram1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        816
+      ],
+      "webhookId": "0263389f-a7c5-470b-bf71-e3c6d4a29d2a",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHKmlzzOWFVGsZVJ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Kirim perintah kontrol ke ESP32 melalui MQTT Broker. Isi parameter message HANYA dengan salah satu teks baku ini: MODE_MANUAL, MODE_AUTO, POMPA_ON, atau POMPA_OFF.",
+        "topic": "hydroponic/command",
+        "sendInputData": false,
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mqttTool",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        1056
+      ],
+      "id": "9b3ed8c2-f141-4ef3-8ca6-c1171a98e5bb",
+      "name": "Kirim Perintah MQTT",
+      "credentials": {
+        "mqtt": {
+          "id": "gpyjv4YLcbgYVPsl",
+          "name": "MQTT account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemma-4-26b-a4b-it",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        1056
+      ],
+      "id": "81469f8f-0de6-4b0c-ac6b-c9320939d1ef",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "pk1KFLHUasCW7mQ0",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "topics": "hydroponic/sensor",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        64
+      ],
+      "id": "8e4bf2e0-f5ef-47c7-bbaf-c1293ed63aaa",
+      "name": "MQTT Trigger",
+      "credentials": {
+        "mqtt": {
+          "id": "gpyjv4YLcbgYVPsl",
+          "name": "MQTT account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "sw-start",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/start"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "sw-help",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/help"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "sw-status",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/status"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "sw-manual",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/manual",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/manual"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "sw-auto",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/auto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/auto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "sw-pompaon",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/pompaon",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/pompaon"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "sw-pompaoff",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/pompaoff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "/pompaoff"
+            }
+          ]
+        },
+        "fallbackOutput": "extra",
+        "options": {}
+      },
+      "id": "cd312986-e958-4a7a-b4ec-f10d939d150e",
+      "name": "Router Perintah",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -640,
+        720
+      ],
+      "notes": "Switch: /start /help /status /manual /auto /pompaon /pompaoff → langsung, else → AI"
+    },
+    {
+      "parameters": {
+        "topic": "hydroponic/command",
+        "sendInputData": false,
+        "message": "MODE_MANUAL",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        816
+      ],
+      "id": "aa000001-0000-0000-0000-000000000001",
+      "name": "MQTT MODE_MANUAL",
+      "credentials": {
+        "id": "gpyjv4YLcbgYVPsl",
+        "name": "MQTT account 2"
+      }
+    },
+    {
+      "parameters": {
+        "topic": "hydroponic/command",
+        "sendInputData": false,
+        "message": "MODE_AUTO",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        944
+      ],
+      "id": "aa000002-0000-0000-0000-000000000002",
+      "name": "MQTT MODE_AUTO",
+      "credentials": {
+        "id": "gpyjv4YLcbgYVPsl",
+        "name": "MQTT account 2"
+      }
+    },
+    {
+      "parameters": {
+        "topic": "hydroponic/command",
+        "sendInputData": false,
+        "message": "POMPA_ON",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        1072
+      ],
+      "id": "aa000003-0000-0000-0000-000000000003",
+      "name": "MQTT POMPA_ON",
+      "credentials": {
+        "id": "gpyjv4YLcbgYVPsl",
+        "name": "MQTT account 2"
+      }
+    },
+    {
+      "parameters": {
+        "topic": "hydroponic/command",
+        "sendInputData": false,
+        "message": "POMPA_OFF",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mqtt",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        1200
+      ],
+      "id": "aa000004-0000-0000-0000-000000000004",
+      "name": "MQTT POMPA_OFF",
+      "credentials": {
+        "id": "gpyjv4YLcbgYVPsl",
+        "name": "MQTT account 2"
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger (Chatbot)1').item.json.message.chat.id }}",
+        "text": "⚙️ <b>Mode MANUAL diaktifkan.</b>\nPompa kini dapat dikontrol manual.\nGunakan /pompaon atau /pompaoff.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "bb000001-0000-0000-0000-000000000001",
+      "name": "Balas /manual",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -96,
+        816
+      ],
+      "credentials": {
+        "id": "vHKmlzzOWFVGsZVJ",
+        "name": "Telegram account"
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger (Chatbot)1').item.json.message.chat.id }}",
+        "text": "✅ <b>Mode AUTO diaktifkan.</b>\nPompa kembali dikontrol otomatis oleh sensor.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "bb000002-0000-0000-0000-000000000002",
+      "name": "Balas /auto",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -96,
+        944
+      ],
+      "credentials": {
+        "id": "vHKmlzzOWFVGsZVJ",
+        "name": "Telegram account"
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger (Chatbot)1').item.json.message.chat.id }}",
+        "text": "✅ <b>Perintah NYALAKAN POMPA dikirim.</b>\n<i>(Hanya efektif saat mode MANUAL)</i>",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "bb000003-0000-0000-0000-000000000003",
+      "name": "Balas /pompaon",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -96,
+        1072
+      ],
+      "credentials": {
+        "id": "vHKmlzzOWFVGsZVJ",
+        "name": "Telegram account"
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger (Chatbot)1').item.json.message.chat.id }}",
+        "text": "❌ <b>Perintah MATIKAN POMPA dikirim.</b>\n<i>(Hanya efektif saat mode MANUAL)</i>",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "bb000004-0000-0000-0000-000000000004",
+      "name": "Balas /pompaoff",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -96,
+        1200
+      ],
+      "credentials": {
+        "id": "vHKmlzzOWFVGsZVJ",
+        "name": "Telegram account"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Validasi Kondisi Air": {
+      "main": [
+        [
+          {
+            "node": "Simpan Data ke Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simpan Data ke Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Kirim ke ThingSpeak",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Apakah Air Kritis?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apakah Air Kritis?": {
+      "main": [
+        [
+          {
+            "node": "Kirim Peringatan Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aman (Skip)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger (Chatbot)1": {
+      "main": [
+        [
+          {
+            "node": "Router Perintah",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buat Pesan /help atau /start1": {
+      "main": [
+        [
+          {
+            "node": "Kirim Pesan /help atau /start1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Kirim Balasan Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baca Sensor MQTT Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kirim Perintah MQTT": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "MQTT Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validasi Kondisi Air",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router Perintah": {
+      "main": [
+        [
+          {
+            "node": "Buat Pesan /help atau /start1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buat Pesan /help atau /start1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MQTT MODE_MANUAL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MQTT MODE_AUTO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MQTT POMPA_ON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MQTT POMPA_OFF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MQTT MODE_MANUAL": {
+      "main": [
+        [
+          {
+            "node": "Balas /manual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MQTT MODE_AUTO": {
+      "main": [
+        [
+          {
+            "node": "Balas /auto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MQTT POMPA_ON": {
+      "main": [
+        [
+          {
+            "node": "Balas /pompaon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MQTT POMPA_OFF": {
+      "main": [
+        [
+          {
+            "node": "Balas /pompaoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c2032e9b-68f3-46e8-a21a-db7554bcbc33",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "79e6b8e2bf8813cff02dc241fa1eb27596d24bb7d2b6a8174f28868f5f80db33"
+  },
+  "id": "T3HEpL4sGOccA5fF",
+  "tags": []
+}
